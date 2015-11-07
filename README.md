@@ -7,7 +7,7 @@ _Yu Guo_, 2015-10-25
 Projects:
 
 1. **Movie trailer**
-2. Tournament result
+2. **Tournament result**
 3. Item catalogue
 4. Conference Organization app
 5. Linux Server

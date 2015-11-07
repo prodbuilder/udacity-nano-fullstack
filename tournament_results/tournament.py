@@ -4,48 +4,41 @@
 #
 
 import psycopg2
+import contextlib
 
-# helper functions to read and update from DB
-def connect():
-    """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=tournament")
-
-def update_with(query, arg=None):
-    con = connect()
+@contextlib.contextmanager
+def with_cursor():
+    """safely connect to db, get cursor, commit and close"""
+    con = psycopg2.connect("dbname=tournament")
     cur = con.cursor()
-    if arg:
-        cur.execute(query, arg)
+    try:
+        yield cur
+    except:
+        raise
     else:
-        cur.execute(query)
-    con.commit()
-    con.close()
-
-def get_with(query):
-    con = connect()
-    cur = con.cursor()
-    cur.execute(query)
-    con.commit()
-    n = cur.fetchall()
-    con.close()
-    return n
-
+        con.commit()
+    finally:
+        con.close()
 
 def deleteMatches():
     """Remove all the match records from the database."""
     query = "DELETE FROM matches;"
-    update_with(query)
-
+    with with_cursor() as cur:
+        cur.execute(query)
 
 def deletePlayers():
     """Remove all the player records from the database."""
     query = "DELETE FROM players;"
-    update_with(query)
-
+    with with_cursor() as cur:
+        cur.execute(query)
 
 def countPlayers():
     """Returns the number of players currently registered."""
     query = "SELECT COUNT(*) FROM players LIMIT 1;"
-    return get_with(query)[0][0]
+    with with_cursor() as cur:
+        cur.execute(query)
+        res = cur.fetchone()
+    return res[0]
 
 def registerPlayer(name):
     """Adds a player to the tournament database.
@@ -57,8 +50,8 @@ def registerPlayer(name):
       name: the player's full name (need not be unique).
     """
     query = "INSERT INTO players (name) VALUES (%s);"
-    update_with(query, (name, ))
-
+    with with_cursor() as cur:
+        cur.execute(query, (name,))
 
 def playerStandings():
     """Returns a list of the players and their win records, sorted by wins.
@@ -74,8 +67,10 @@ def playerStandings():
         matches: the number of matches the player has played
     """
     query = "SELECT id, name, wins, matches from standings;"
-    return get_with(query)
-
+    with with_cursor() as cur:
+        cur.execute(query)
+        res = cur.fetchall()
+    return res
 
 def reportMatch(winner, loser):
     """Records the outcome of a single match between two players.
@@ -85,8 +80,8 @@ def reportMatch(winner, loser):
       loser:  the id number of the player who lost
     """
     query = "INSERT INTO matches (winner, loser, score) VALUES (%s, %s, %s)"
-    update_with(query, (winner, loser, 1))
-
+    with with_cursor() as cur:
+        cur.execute(query, (winner, loser, 1))
 
 def swissPairings():
     """Returns a list of pairs of players for the next round of a match.
@@ -104,5 +99,8 @@ def swissPairings():
         name2: the second player's name
     """
     query = "SELECT * from pairings;"
-    return get_with(query)
+    with with_cursor() as cur:
+        cur.execute(query)
+        res = cur.fetchall()
+    return res
 
