@@ -1,0 +1,18 @@
+<div>
+    <h2>Categories</h2>
+</div>
+
+<div>
+<ul>
+    {% for cat in categories %}
+        <li><a href="{{url_for('showCategoryItemsByName', category_name = cat.name)}}">
+        {% if category_name %}
+            {% if category_name == cat.name %}
+              <span class='margin-right'></span>
+              <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
+            {% endif %}
+        {% endif %}
+        {{cat.name}}</a></li>
+    {% endfor %}
+</ul>
+</div>
