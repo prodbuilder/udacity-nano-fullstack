@@ -10,7 +10,7 @@
                 <div class="form-group">
 
                 <div style="display:none">
-                    <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
                 </div>
 
                 <label for="name">Name:</label>

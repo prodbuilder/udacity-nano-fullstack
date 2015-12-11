@@ -2,6 +2,11 @@ Item Catalog
 =========
 
 # Startup Guide
+Install python dependencies via `pip`
+```python
+pip install -r requirements.txt
+```
+
 To setup initial data
 ```python
 python add_data.py

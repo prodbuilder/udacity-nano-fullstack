@@ -1,41 +1,37 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+#--------------------------------------------------------------
+#
+# Item Catalog App
+#
+#--------------------------------------------------------------
+#
+# Date:   2015-12-10
+#
+# Author: Yu Guo <yuguo01462@gmail.com>
+#
+
+
 from flask import Flask, render_template, request, redirect,jsonify, url_for, flash, send_from_directory
-from sqlalchemy import create_engine, asc, desc, func
-from sqlalchemy.orm import sessionmaker
-from db import Base, User, Category, Item
 from flask import session as login_session
-import random
-import string
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
 import json
-from flask import make_response
 import requests
-import os
-from werkzeug import secure_filename
-import time
+
+
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+from dict2xml import dict2xml as xmlify
+from flask.ext.seasurf import SeaSurf
+from helper import *
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
-ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
-#--------------------------------------------------------------
-# Global Constants & Vars
-#--------------------------------------------------------------
-
-
-# Enable protection agains *Cross-site Request Forgery (CSRF)*
-CSRF_ENABLED     = True
-
-#Connect to Database and create database session
-engine = create_engine('sqlite:///catalog.db')
-Base.metadata.bind = engine
-
-DBSession = sessionmaker(bind=engine)
-session = DBSession(autocommit=True)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
+csrf = SeaSurf(app)
 
 #--------------------------------------------------------------
 # Global Functions
@@ -59,40 +55,11 @@ def internalError(error):
 # 1. User Login/Logout Functions
 #--------------------------------------------------------------
 
-# User Helper Functions
-def createUser(login_session):
-    newUser = User(name=login_session['username'], email=login_session['email'], picture=login_session['picture'])
-    session.add(newUser)
-    user = session.query(User).filter_by(email=login_session['email']).one()
-    return user.id
-
-def getUserInfo(user_id):
-    user = session.query(User).filter_by(id=user_id).one()
-    return user
-
-def getUserID(email):
-    try:
-        user = session.query(User).filter_by(email=email).one()
-        return user.id
-    except:
-        return None
-
-def loginOrCreateNew(user_id):
-    if not user_id:
-        user_id = createUser(login_session)
-    return user_id
-
-def getStateToken():
-    return ''.join(random.choice(string.ascii_uppercase + string.digits)
-                    for x in xrange(32))
-
 @app.route('/login', methods = ['GET', 'POST'])
 def login():
     # Create anti-forgery state token
-    state = getStateToken()
-    login_session['state'] = state
-    categories = session.query(Category).order_by(asc(Category.name))
-    return render_template('login.html', categories = categories, STATE = state)
+    login_session['state'] = getStateToken()
+    return render_template('login.html', categories = getCategories(), STATE = login_session['state'])
 
 
 @app.route('/logout', methods = ['GET', 'POST'])
@@ -118,15 +85,9 @@ def logout():
         flash("You were not logged in")
     return redirect(url_for('index'))
 
-def returnResponseJSON(msg, code):
-    """helper function to make a json response msg"""
-    response = make_response(json.dumps(msg), code)
-    response.headers['Content-Type'] = 'application/json'
-    return response
-
 
 # Facebook connect
-
+@csrf.exempt
 @app.route('/fbconnect', methods=['POST'])
 def fbconnect():
     invalid_state_token = request.args.get('state') != login_session['state']
@@ -159,12 +120,13 @@ def fbconnect():
     login_session['picture'] = data["data"]["url"]
 
     # see if user exists, if it doesn't make a new one
-    login_session['user_id'] = loginOrCreateNew(getUserID(login_session["email"]))
+    login_session['user_id'] = loginOrCreateNew(getUserID(login_session["email"]), login_session)
 
     output = """<h1>Welcome, %s!</h1> <img src="%s" style = "width: 300px; height: 300px;border-radius: 150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;">""" % (login_session['username'], login_session['picture'])
     flash("you are now logged in as %s" % login_session['username'])
     return output
 
+@csrf.exempt
 @app.route('/fbdisconnect')
 def fbdisconnect():
     facebook_id = login_session['facebook_id']
@@ -176,6 +138,7 @@ def fbdisconnect():
         return returnResponseJSON('Failed to revoke token for given user.', 400)
 
 # Google connect
+@csrf.exempt
 @app.route('/gconnect', methods=['POST'])
 def gconnect():
     invalid_state_token = request.args.get('state') != login_session['state']
@@ -227,13 +190,14 @@ def gconnect():
     login_session['email'] = answer['email']
 
     # see if user exists, if it doesn't make a new one
-    login_session['user_id'] = loginOrCreateNew(getUserID(answer["email"]))
+    login_session['user_id'] = loginOrCreateNew(getUserID(answer["email"]), login_session)
 
     output = """<h1>Welcome, %s!</h1> <img src="%s" style = "width: 300px; height: 300px;border-radius: 150px;-webkit-border-radius: 150px;-moz-border-radius: 150px;">""" % (login_session['username'], login_session['picture'])
     flash("you are now logged in as %s" % login_session['username'])
     return output
 
 
+@csrf.exempt
 @app.route('/gdisconnect')
 def gdisconnect():
     # Only disconnect a connected user.
@@ -252,43 +216,38 @@ def gdisconnect():
 # JSON API to view category information
 @app.route('/categories.json')
 def categoriesJSON():
-    categories = session.query(Category).order_by(asc(Category.name)).all()
+    categories = getCategories()
     return jsonify(categories = [c.serialize for c in categories])
 
 # JSON API to view all items in a category
 @app.route('/category/<int:category_id>/items.json')
 def categoryItemsJSON(category_id):
-    category_items = session.query(Item).filter_by(category_id = category_id).all()
+    category_items = getCategoryItemsByCategoryId(category_id)
     return jsonify(items = [i.serialize for i in category_items])
 
 # JSON API to view an item in a category by id
 @app.route('/category/<int:category_id>/item/<int:item_id>.json')
 def categoryItemJSON(category_id, item_id):
-    item = session.query(Item).filter_by(category_id = category_id, id = item_id).one()
+    item = getItemByCategoryIdItemId(category_id, item_id)
     return jsonify(item = item.serialize)
 
 # JSON API to view all items
 @app.route('/items.json')
 def itemsJSON():
-    items = session.query(Item).order_by(asc(Item.name)).all()
+    items = getAllItems()
     return jsonify(items = [i.serialize for i in items])
 
 # JSON API to view an item by id
 @app.route('/item/<int:item_id>.json')
 def itemJSON(item_id):
-    item = session.query(Item).filter_by(id = item_id).one()
+    item = getItemById(item_id)
     return jsonify(item = item.serialize)
+
 
 # JSON API to view all items by category
 @app.route('/catalog.json')
 def catalogJSON():
-    categories = session.query(Category).order_by(asc(Category.name)).all()
-    res = []
-    for c in categories:
-        category_items = session.query(Item).filter_by(category_id = c.id).all()
-        a = c.serialize
-        a.update({'items': [i.serialize for i in category_items]})
-        res.append(a)
+    res = baseCatalog()
     return jsonify(Categories = res)
 
 #--------------------------------------------------------------
@@ -298,22 +257,10 @@ def catalogJSON():
 # XML API to view all items by category
 @app.route('/catalog.xml')
 def catalogXML():
-    categories = session.query(Category).order_by(asc(Category.name)).all()
-    res = []
-    for c in categories:
-        category_items = session.query(Item).filter_by(category_id = c.id).all()
-        a = c.serialize
-        items = []
-        for i in category_items:
-            tmp = i.serialize
-            tmp.update({'author': i.user.name})
-            items.append(tmp)
-        a.update({'items': items})
-        res.append(a)
-    catalog = render_template('catalog_template.xml', categories = res)
-    response = make_response(catalog, 200)
-    response.headers['Content-Type'] = 'application/xml'
-    return response
+    res = {'category': baseCatalog()}
+    catalog = xmlify(res, wrap = "Categories", indent="  ")
+    return returnResponseXML(catalog, 200)
+
 
 
 #--------------------------------------------------------------
@@ -325,161 +272,119 @@ def catalogXML():
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-# helper function: get category id from category name
-def getCategoryName(category_name):
-    return session.query(Category).filter(func.lower(Category.name) == func.lower(category_name)).one().id
-
 # Show all categories
 @app.route('/')
 def index():
-    categories = session.query(Category).order_by(asc(Category.name))
-    items = session.query(Item).order_by(desc(Item.last_updated)).limit(30)
-    return render_template('ShowItems.html', categories = categories, items = items, title='Latest Items')
+    return render_template('ShowItems.html', \
+                            categories = getCategories(), \
+                            items = getLatestItems(), \
+                            title='Latest Items')
 
 # Show all items in a category by name
 @app.route('/catalog/<category_name>/items/')
 def showCategoryItemsByName(category_name):
-    categories = session.query(Category).order_by(asc(Category.name))
-    category_id = getCategoryName(category_name)
-    category_items = session.query(Item).join(Item.category).filter(Category.name == category_name).all()
-    return render_template('ShowItems.html', categories = categories, items = category_items,
-        category_name = category_name,
-        title = '%s Items (%s items)' % (category_name, len(category_items)))
+    category_items = getCategoryItems(category_name)
+    return render_template('ShowItems.html', \
+                            categories = getCategories(), \
+                            items = category_items, \
+                            category_name = category_name, \
+                            title = '%s Items (%s items)' % (category_name, len(category_items)))
 
 # Show a particular item in a category by name
 @app.route('/catalog/<category_name>/<item_name>/')
 def showCategoryItemByName(category_name, item_name):
-    categories = session.query(Category).order_by(asc(Category.name))
-    category_id = getCategoryName(category_name)
-    item = session.query(Item).join(Item.category).filter(Category.name == category_name, Item.name == item_name).one()
-    # item = session.query(Item).filter_by(category_id = category_id, id = item_id).one()
-    return render_template('ShowItem.html', categories = categories, item = item, category_name = category_name)
+    return render_template('ShowItem.html', \
+                            categories = getCategories(), \
+                            item = getItemByName(category_name, item_name), \
+                            category_name = category_name)
 
 #--------------------------------------------------------------
 # 4. Create, Update, Delete items
 #--------------------------------------------------------------
 
-# Helper function to allow certain extensions
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+#--------------------------------------------------------------
+# Decorator for login required
+#--------------------------------------------------------------
 
-# Helper add picture
-def add_pic(file):
-    """Helper function to save uploaded file and return filename"""
-    if file and allowed_file(file.filename):
-        # add timestamp to differentiate between files with same name
-        filename = str(int(time.time())) + secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        return filename
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in login_session:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 # Create new item
 @app.route('/item/new', methods = ['GET', 'POST'])
+@login_required
 def createAnyItem():
-    categories = session.query(Category).order_by(asc(Category.name))
-    if 'username' not in login_session:
-        return redirect(url_for('login'))
     if request.method == 'POST':
-        # CSRF check
-        if request.form.get('csrfmiddlewaretoken') != login_session['csrf_token']:
-            return returnResponseJSON('Invalid state parameter.', 401)
-        category_id = getCategoryName(request.form['category_name'])
-        picture = add_pic(request.files['file'])
-        newItem = Item(name = request.form['name'], description = request.form['description'], category_id = category_id, user_id = login_session['user_id'], picture = picture)
-        session.add(newItem)
-        flash('New Item %s has been successfully created!' % newItem.name)
-        return redirect(url_for('index'))
+        if request.form['name'] and request.form['description']:
+            newItem = addNewItem(request.form['name'],
+                                 request.form['description'],
+                                 request.files['file'],
+                                 login_session['user_id'],
+                                 request.form['category_name'])
+            flash('New Item %s has been successfully created!' % newItem.name)
+            return redirect(url_for('index'))
     else:
-        token = getStateToken()
-        login_session['csrf_token'] = token
-        return render_template('NewItem.html', categories = categories, csrf_token = token)
+        return render_template('NewItem.html', categories = getCategories())
 
 
 # Create new category item by category name
 @app.route('/catalog/<category_name>/item/new', methods = ['GET', 'POST'])
+@login_required
 def createCategoryItemByName(category_name):
-    categories = session.query(Category).order_by(asc(Category.name))
-    category_id = getCategoryName(category_name)
-    if 'username' not in login_session:
-        return redirect(url_for('login'))
     if request.method == 'POST':
-        # CSRF check
-        if request.form.get('csrfmiddlewaretoken') != login_session['csrf_token']:
-            return returnResponseJSON('Invalid state parameter.', 401)
-
-        if request.form['name'] and request.form['description'] and category_id and login_session['user_id']:
-            picture = add_pic(request.files['file'])
-            newItem = Item(name = request.form['name'], description = request.form['description'], category_id = category_id, user_id = login_session['user_id'], picture = picture)
-            session.add(newItem)
-            flash('New Item %s has been successfully created!' % newItem.name)
+        category_id = getCategoryName(category_name)
+        if request.form['name'] and request.form['description'] and category_id:
+            newItem = addNewItem(request.form['name'],
+                                 request.form['description'],
+                                 request.files['file'],
+                                 login_session['user_id'],
+                                 category_name)
+            flash('New Item %s has been successfully created in %s!' % (newItem.name, category_name))
             return redirect(url_for('showCategoryItemsByName', category_name = category_name))
-
-        token = getStateToken()
-        login_session['csrf_token'] = token
-        return render_template('NewItem.html', categories = categories, category_name = category_name, csrf_token = token)
+        return render_template('NewItem.html', categories = getCategories(), category_name = category_name)
     else:
-        token = getStateToken()
-        login_session['csrf_token'] = token
-        return render_template('NewItem.html', categories = categories, category_name = category_name, csrf_token = token)
+        return render_template('NewItem.html', categories = getCategories(), category_name = category_name)
 
 
 # Edit an item by category and item name
 @app.route('/catalog/<category_name>/<item_name>/edit', methods = ['GET', 'POST'])
+@login_required
 def editItemByName(category_name, item_name):
-    categories = session.query(Category).order_by(asc(Category.name))
-    category_id = getCategoryName(category_name)
-    editedItem = session.query(Item).filter_by(category_id = category_id, name = item_name).one()
-    if 'username' not in login_session:
-        flash('You need to login in order to edit an item.')
-        return redirect(url_for('login'))
+    editedItem = getItemByName(category_name, item_name)
+
     if editedItem.user_id != login_session['user_id']:
         flash("You can not edit someone else's item!")
         return redirect(url_for('showCategoryItemsByName', category_name = category_name))
 
     if request.method == 'POST':
-        # CSRF check
-        if request.form.get('csrfmiddlewaretoken') != login_session['csrf_token']:
-            return returnResponseJSON('Invalid state parameter.', 401)
-
-        if request.form['name']:
-            editedItem.name = request.form['name']
-        if request.form['description']:
-            editedItem.description = request.form['description']
-        picture = add_pic(request.files['file'])
-        if picture:
-            editedItem.picture = picture
-        session.add(editedItem)
+        editedItem = editItem(editedItem, request.form['name'], request.form['description'], request.files['file'])
         flash('Item %s has been successfully edited!' % editedItem.name)
         return redirect(url_for('showCategoryItemByName', category_name=category_name, item_name=editedItem.name))
     else:
-        token = getStateToken()
-        login_session['csrf_token'] = token
-        return render_template('EditItem.html', categories = categories, item = editedItem, category_name = editedItem.category.name, csrf_token = token)
+        return render_template('EditItem.html', categories = getCategories(), item = editedItem, category_name = editedItem.category.name)
 
 
 # Delete an item by category and item name
 @app.route('/catalog/<category_name>/<item_name>/delete', methods = ['GET', 'POST'])
+@login_required
 def deleteItemByName(category_name, item_name):
-    categories = session.query(Category).order_by(asc(Category.name))
-    category_id = getCategoryName(category_name)
-    deleteItem = session.query(Item).filter_by(category_id = category_id, name = item_name).one()
-    if 'username' not in login_session:
-        flash('You need to login in order to delete an item.')
-        return redirect(url_for('login'))
-    if deleteItem.user_id != login_session['user_id']:
+    deletedItem = getItemByName(category_name, item_name)
+
+    if deletedItem.user_id != login_session['user_id']:
         flash("You can not delete someone else's item!")
         return redirect(url_for('showCategoryItemsByName', category_name=category_name))
-    if request.method == 'POST':
-        # CSRF check
-        if request.form.get('csrfmiddlewaretoken') != login_session['csrf_token']:
-            return returnResponseJSON('Invalid state parameter.', 401)
 
-        session.delete(deleteItem)
-        flash('Item has been successfully deleted!')
+    if request.method == 'POST':
+        deleteItem(deletedItem)
+        flash('Item %s has been successfully deleted!' %item_name)
         return redirect(url_for('showCategoryItemsByName', category_name=category_name))
     else:
-        token = getStateToken()
-        login_session['csrf_token'] = token
-        return render_template('DeleteItem.html', categories = categories, item = deleteItem, csrf_token = token)
+        return render_template('DeleteItem.html', categories = getCategories(), item = deletedItem)
 
 
 if __name__ == '__main__':
