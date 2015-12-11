@@ -268,7 +268,7 @@ def catalogXML():
 #--------------------------------------------------------------
 
 # Helper function to show uploaded files
-@app.route('/uploads/<filename>')
+@app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
@@ -281,7 +281,7 @@ def index():
                             title='Latest Items')
 
 # Show all items in a category by name
-@app.route('/catalog/<category_name>/items/')
+@app.route('/catalog/<path:category_name>/items/')
 def showCategoryItemsByName(category_name):
     category_items = getCategoryItems(category_name)
     return render_template('ShowItems.html', \
@@ -291,7 +291,7 @@ def showCategoryItemsByName(category_name):
                             title = '%s Items (%s items)' % (category_name, len(category_items)))
 
 # Show a particular item in a category by name
-@app.route('/catalog/<category_name>/<item_name>/')
+@app.route('/catalog/<path:category_name>/<path:item_name>/')
 def showCategoryItemByName(category_name, item_name):
     return render_template('ShowItem.html', \
                             categories = getCategories(), \
@@ -333,7 +333,7 @@ def createAnyItem():
 
 
 # Create new category item by category name
-@app.route('/catalog/<category_name>/item/new', methods = ['GET', 'POST'])
+@app.route('/catalog/<path:category_name>/item/new', methods = ['GET', 'POST'])
 @login_required
 def createCategoryItemByName(category_name):
     if request.method == 'POST':
@@ -352,7 +352,7 @@ def createCategoryItemByName(category_name):
 
 
 # Edit an item by category and item name
-@app.route('/catalog/<category_name>/<item_name>/edit', methods = ['GET', 'POST'])
+@app.route('/catalog/<path:category_name>/<path:item_name>/edit', methods = ['GET', 'POST'])
 @login_required
 def editItemByName(category_name, item_name):
     editedItem = getItemByName(category_name, item_name)
@@ -370,7 +370,7 @@ def editItemByName(category_name, item_name):
 
 
 # Delete an item by category and item name
-@app.route('/catalog/<category_name>/<item_name>/delete', methods = ['GET', 'POST'])
+@app.route('/catalog/<path:category_name>/<path:item_name>/delete', methods = ['GET', 'POST'])
 @login_required
 def deleteItemByName(category_name, item_name):
     deletedItem = getItemByName(category_name, item_name)
