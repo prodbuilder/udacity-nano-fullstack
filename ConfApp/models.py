@@ -17,9 +17,13 @@ import endpoints
 from protorpc import messages
 from google.appengine.ext import ndb
 
+# - - - Exception models - - - - - - - - - - - - - - - - -
+
 class ConflictException(endpoints.ServiceException):
     """ConflictException -- exception mapped to HTTP 409 response"""
     http_status = httplib.CONFLICT
+
+# - - - Profile models - - - - - - - - - - - - - - - - -
 
 class Profile(ndb.Model):
     """Profile -- User profile object"""
@@ -40,6 +44,27 @@ class ProfileForm(messages.Message):
     teeShirtSize = messages.EnumField('TeeShirtSize', 3)
     conferenceKeysToAttend = messages.StringField(4, repeated=True)
 
+class TeeShirtSize(messages.Enum):
+    """TeeShirtSize -- t-shirt size enumeration value"""
+    NOT_SPECIFIED = 1
+    XS_M = 2
+    XS_W = 3
+    S_M = 4
+    S_W = 5
+    M_M = 6
+    M_W = 7
+    L_M = 8
+    L_W = 9
+    XL_M = 10
+    XL_W = 11
+    XXL_M = 12
+    XXL_W = 13
+    XXXL_M = 14
+    XXXL_W = 15
+
+
+# - - - Message models - - - - - - - - - - - - - - - - -
+
 class StringMessage(messages.Message):
     """StringMessage-- outbound (single) string message"""
     data = messages.StringField(1, required=True)
@@ -47,6 +72,8 @@ class StringMessage(messages.Message):
 class BooleanMessage(messages.Message):
     """BooleanMessage-- outbound Boolean value message"""
     data = messages.BooleanField(1)
+
+# - - - Conference models - - - - - - - - - - - - - - - - -
 
 class Conference(ndb.Model):
     """Conference -- Conference object"""
@@ -80,23 +107,7 @@ class ConferenceForms(messages.Message):
     """ConferenceForms -- multiple Conference outbound form message"""
     items = messages.MessageField(ConferenceForm, 1, repeated=True)
 
-class TeeShirtSize(messages.Enum):
-    """TeeShirtSize -- t-shirt size enumeration value"""
-    NOT_SPECIFIED = 1
-    XS_M = 2
-    XS_W = 3
-    S_M = 4
-    S_W = 5
-    M_M = 6
-    M_W = 7
-    L_M = 8
-    L_W = 9
-    XL_M = 10
-    XL_W = 11
-    XXL_M = 12
-    XXL_W = 13
-    XXXL_M = 14
-    XXXL_W = 15
+# - - - Conference query models - - - - - - - - - - - - - - - - -
 
 class ConferenceQueryForm(messages.Message):
     """ConferenceQueryForm -- Conference query inbound form message"""
@@ -107,4 +118,43 @@ class ConferenceQueryForm(messages.Message):
 class ConferenceQueryForms(messages.Message):
     """ConferenceQueryForms -- multiple ConferenceQueryForm inbound form message"""
     filters = messages.MessageField(ConferenceQueryForm, 1, repeated=True)
+
+# - - - Session models - - - - - - - - - - - - - - - - -
+
+class Session(ndb.Model):
+    """Session -- Conference Session object"""
+    conferenceKey    = ndb.StringProperty()
+    name            = ndb.StringProperty(required=True)
+    highlights      = ndb.BooleanProperty()
+    speakers        = ndb.StringProperty(repeated=True)
+    duration        = ndb.IntegerProperty()
+    typeOfSession   = ndb.StringProperty(default='NOT_SPECIFIED')
+    date            = ndb.DateTimeProperty()
+    startTime       = ndb.TimeProperty() # (in 24 hour notation so it can be ordered).
+
+class SessionForm(messages.Message):
+    """SessionForm -- Conference Session outbound form message"""
+    conferenceKey      = messages.StringField(1)
+    name               = messages.StringField(2)
+    highlights         = messages.BooleanField(3)
+    speakers           = messages.StringField(4, repeated=True)
+    duration           = messages.IntegerField(5)
+    typeOfSession      = messages.EnumField('SessionTypes', 6)
+    date               = messages.StringField(7)  # DateTimeField()
+    startTime          = messages.StringField(8) # TimeField() (in 24 hour notation so it can be ordered).
+    websafeKey         = messages.StringField(9)
+    conferenceName     = messages.StringField(11)
+
+class SessionForms(messages.Message):
+    """SessionForms -- multiple Conference Session outbound form message"""
+    items = messages.MessageField(SessionForm, 1, repeated=True)
+
+
+class SessionTypes(messages.Enum):
+    """SessionTypes -- session type enumeration value"""
+    NOT_SPECIFIED = 1
+    Workshop = 2
+    Lecture = 3
+    Forum = 4
+    Keynote = 5
 
