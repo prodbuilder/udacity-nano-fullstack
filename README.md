@@ -4,7 +4,7 @@ _Yu Guo_, 2015-10-25
 
 ### Full Stack Web Development
 
-Projects:
+Projects [Descriptions and Rubrics](https://docs.google.com/document/d/1lVFoZDY-jjg6SoI8g5uZ72V3TDp7iLTz2UGWAI5ZvfE/edit#):
 
 1. **Movie trailer** (2015-10-27) [Spec](https://docs.google.com/document/d/1joDQNQl_4icYYm6tM_F9ch5hZEH_f157hlljSUGOLWs/pub?embedded=true)
 2. **Tournament result** (2015-11-07) [Spec](https://docs.google.com/document/d/16IgOm4XprTaKxAa8w02y028oBECOoB1EI1ReddADEeY/pub?embedded=true)
