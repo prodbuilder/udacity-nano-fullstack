@@ -75,6 +75,10 @@ class BooleanMessage(messages.Message):
     """BooleanMessage-- outbound Boolean value message"""
     data = messages.BooleanField(1)
 
+class StringMessages(messages.Message):
+    """StringMessages-- outbound (multiple) string messages"""
+    data = messages.StringField(1, repeated=True)
+
 # - - - Conference models - - - - - - - - - - - - - - - - -
 
 class Conference(ndb.Model):
@@ -159,11 +163,3 @@ class SessionType(messages.Enum):
     Lecture = 3
     Forum = 4
     Keynote = 5
-
-# - - - Session Query models - - - - - - - - - - - - - - - - -
-
-class ConferenceSessionTypeQueryForm(messages.Message):
-    """ConferenceSessionTypeQueryForm --
-    Conference Session query inbound form message
-    """
-    typeOfSession      = messages.EnumField('SessionType', 1)

@@ -2,6 +2,7 @@ import json
 import os
 import time
 import uuid
+import logging
 
 from google.appengine.api import urlfetch
 from models import Profile
@@ -43,3 +44,11 @@ def getUserId(user, id_type="email"):
             return profile.id()
         else:
             return str(uuid.uuid1().get_hex())
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+# helper functions for debug
+def debug(content, sep=None):
+    logging.info('\n\n============= %s ==============\n', sep)
+    logging.info('\n\n    value = %s \n    type=%s\n\n' % (content, type(content)))

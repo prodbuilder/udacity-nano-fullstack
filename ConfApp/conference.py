@@ -23,8 +23,11 @@ from models import ConflictException
 from models import Profile
 from models import ProfileMiniForm
 from models import ProfileForm
+
 from models import StringMessage
+from models import StringMessages
 from models import BooleanMessage
+
 from models import Conference
 from models import ConferenceForm
 from models import ConferenceForms
@@ -36,7 +39,6 @@ from models import Session
 from models import SessionForm
 from models import SessionForms
 from models import SessionType
-from models import ConferenceSessionTypeQueryForm
 
 from settings import WEB_CLIENT_ID
 from settings import ANDROID_CLIENT_ID
@@ -44,8 +46,9 @@ from settings import IOS_CLIENT_ID
 from settings import ANDROID_AUDIENCE
 
 from utils import getUserId
+from utils import debug
 
-import logging
+from collections import defaultdict
 
 # - - - - - - GLOBAL Variables - - - - - - - - - - - - - - -
 
@@ -53,12 +56,15 @@ import logging
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-# memcache
+# - - - - - - - memcache - - - - - - - - - - - - - - - - - -
 MEMCACHE_ANNOUNCEMENTS_KEY = "RECENT_ANNOUNCEMENTS"
 ANNOUNCEMENT_TPL = ('Last chance to attend! The following conferences '
                     'are nearly sold out: %s')
+
+MEMCACHE_FEATUREDSPEAKER_KEY = "FEATURED SPEAKERS"
+FEATURED_SPEAKER_TPL = ('Featured Speaker %s will speak at %s sessions at %s:\nThey are %s.')
+
+
 
 # Default form values
 DEFAULTS = {
@@ -89,6 +95,15 @@ FIELDS =    {
             'MAX_ATTENDEES': 'maxAttendees',
             }
 
+SESSION_FIELDS = {
+    'DURATION': 'duration',
+    'SPEAKERS': 'speakers',
+    'TYPEOFSESSION': 'typeOfSession',
+    'STARTTIME': 'startTime',
+    'DATE': 'date',
+    'HIGHLIGHTS': 'highlights',
+}
+
 # Resource containers (defined From class with query parameters)
 CONF_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
@@ -100,32 +115,20 @@ CONF_POST_REQUEST = endpoints.ResourceContainer(
     websafeConferenceKey=messages.StringField(1),
 )
 
+SESSION_GET_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    websafeSessionKey=messages.StringField(1),
+)
+
 SESSION_POST_REQUEST = endpoints.ResourceContainer(
     SessionForm,
     websafeConferenceKey=messages.StringField(1),
 )
 
-CONF_SESSION_TYPE_QUERY_REQUEST = endpoints.ResourceContainer(
-    ConferenceSessionTypeQueryForm,
+SESSION_QUERY_REQUEST = endpoints.ResourceContainer(
+    ConferenceQueryForms,
     websafeConferenceKey=messages.StringField(1),
 )
-
-# TODO: change this to use pre defined values
-SESSION_GET_REQUEST = endpoints.ResourceContainer(
-    speakerName = messages.StringField(1),
-)
-
-# TODO: remove the 2
-SESSION_GET_REQUEST2 = endpoints.ResourceContainer(
-    message_types.VoidMessage,
-    websafeSessionKey=messages.StringField(1),
-)
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-# helper functions for debug -- to remove later
-def debug(content, sep=None):
-    logging.info('============= %s ==============', sep)
-    logging.info(content)
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 @endpoints.api(name='conference', version='v1', audiences=[ANDROID_AUDIENCE],
@@ -323,7 +326,7 @@ class ConferenceApi(remote.Service):
         return q
 
 
-    def _formatFilters(self, filters):
+    def _formatFilters(self, filters, FIELDS=FIELDS, OPERATORS=OPERATORS):
         """Parse, check validity and format user supplied filters."""
         formatted_filters = []
         inequality_field = None
@@ -349,6 +352,34 @@ class ConferenceApi(remote.Service):
 
             formatted_filters.append(filtr)
         return (inequality_field, formatted_filters)
+
+    # TODO: allow multiple inequality filter here
+    # def _formatFilters(self, filters, FIELDS=FIELDS, OPERATORS=OPERATORS):
+        # """Parse, check validity and format user supplied filters."""
+        # formatted_filters = []
+        # inequality_field = None
+
+        # for f in filters:
+        #     filtr = {field.name: getattr(f, field.name) for field in f.all_fields()}
+
+        #     try:
+        #         filtr["field"] = FIELDS[filtr["field"]]
+        #         filtr["operator"] = OPERATORS[filtr["operator"]]
+        #     except KeyError:
+        #         raise endpoints.BadRequestException("Filter contains invalid field or operator.")
+
+        #     # Every operation except "=" is an inequality
+        #     if filtr["operator"] != "=":
+        #         # check if inequality operation has been used in previous filters
+        #         # disallow the filter if inequality was performed on a different field before
+        #         # track the field on which the inequality operation is performed
+        #         if inequality_field and inequality_field != filtr["field"]:
+        #             raise endpoints.BadRequestException("Inequality filter is allowed on only one field.")
+        #         else:
+        #             inequality_field = filtr["field"]
+
+        #     formatted_filters.append(filtr)
+        # return (inequality_field, formatted_filters)
 
 
     @endpoints.method(ConferenceQueryForms, ConferenceForms,
@@ -385,10 +416,6 @@ class ConferenceApi(remote.Service):
             if hasattr(prof, field.name):
                 # convert t-shirt string to Enum; just copy others
                 if field.name == 'teeShirtSize':
-                    logging.info('============ profile ============')
-                    logging.info("type=%s, value=%s" % (
-                        type(getattr(TeeShirtSize, getattr(prof, field.name))),
-                        getattr(TeeShirtSize, getattr(prof, field.name))))
                     setattr(pf, field.name, getattr(TeeShirtSize, getattr(prof, field.name)))
                 else:
                     setattr(pf, field.name, getattr(prof, field.name))
@@ -690,14 +717,19 @@ class ConferenceApi(remote.Service):
         data['key'] = s_key
         data['conferenceKey'] = request.websafeConferenceKey
 
-        # create Session, send email to organizer confirming
-        # creation of Session & return (modified) SessionForm
+        # create session
         session = Session(**data)
         session.put()
+
+        # email organizer, confirming creation of session
         taskqueue.add(params={'email': user.email(),
-            'conferenceSessionInfo': repr(request)},
+            'conferenceSessionInfo': repr(data)},
             url='/tasks/send_confirmation_email'
         )
+        taskqueue.add(params={'websafeSessionKey': s_key.urlsafe()},
+            url='/tasks/set_featured_speaker'
+        )
+
         return self._copySessionToForm(session, getattr(conf, 'name'))
 
 
@@ -754,7 +786,7 @@ class ConferenceApi(remote.Service):
         return message_types.VoidMessage()
 
 
-    @endpoints.method(CONF_SESSION_TYPE_QUERY_REQUEST, SessionForms,
+    @endpoints.method(SESSION_QUERY_REQUEST, SessionForms,
             path='conference/{websafeConferenceKey}/sessions',
             http_method='POST', name='getConferenceSessionsByType')
     def getConferenceSessionsByType(self, request):
@@ -764,22 +796,16 @@ class ConferenceApi(remote.Service):
         if not conf:
             raise endpoints.NotFoundException(
                 'No conference found with key: %s' % request.websafeConferenceKey)
-
-        if not request.typeOfSession:
-            raise endpoints.BadRequestException("Session 'typeOfSession' field required")
-
-        sessions = Session.query(ancestor=conf.key).filter(Session.typeOfSession==str(getattr(request, 'typeOfSession')))
-
+        sessions = self._getSessionQuery(request, ancestor=conf.key, required_fields=['typeOfSession'])
         return SessionForms(items = [self._copySessionToForm(session, getattr(conf, 'name')) for session in sessions])
 
-    @endpoints.method(SESSION_GET_REQUEST, SessionForms,
+    # reuse conference query form in session queries as well
+    @endpoints.method(ConferenceQueryForms, SessionForms,
         path='session',
         http_method='GET', name='getSessionsBySpeaker')
     def getSessionsBySpeaker(self, request):
         """Return all sessions with a speaker (by Speaker Name)"""
-        if not request.speakerName:
-            raise endpoints.BadRequestException("Session 'speakerName' field required")
-        sessions=Session.query().filter(Session.speakers == request.speakerName)
+        sessions = self._getSessionQuery(request, ancestor=None, required_fields=['speakers'])
 
         # get each session's parent conference name
         conf_keys = [ndb.Key(urlsafe=session.conferenceKey) for session in sessions]
@@ -829,7 +855,7 @@ class ConferenceApi(remote.Service):
         prof.put()
         return BooleanMessage(data=retval)
 
-    @endpoints.method(SESSION_GET_REQUEST2, BooleanMessage,
+    @endpoints.method(SESSION_GET_REQUEST, BooleanMessage,
         path='session/{websafeSessionKey}',
         http_method="POST",
         name="addSessionToWishlist")
@@ -837,7 +863,7 @@ class ConferenceApi(remote.Service):
         """add session to user's wishlist"""
         return self._sessionWishList(request, add=True)
 
-    @endpoints.method(SESSION_GET_REQUEST2, BooleanMessage,
+    @endpoints.method(SESSION_GET_REQUEST, BooleanMessage,
         path='session/{websafeSessionKey}',
         http_method="DELETE",
         name="removeSessionFromWishlist")
@@ -864,6 +890,87 @@ class ConferenceApi(remote.Service):
 
         # return set of ConferenceForm objects per Conference
         return SessionForms(items = [self._copySessionToForm(session, getattr(conf, 'name')) for session in sessions])
+
+# - - - Session Query  - - - - - - - - - - - - - - - - -
+    def _getSessionQuery(self, request, ancestor = None, required_fields = []):
+        """Return formatted query from the submitted filters."""
+        if ancestor:
+            q = Session.query(ancestor=ancestor)
+        else:
+            q = Session.query()
+
+        inequality_filter, filters = self._formatFilters(request.filters, SESSION_FIELDS, OPERATORS)
+        # all required_fields must appear in filters field
+        included_fields = [f['field'] for f in filters]
+        missing_fields = [rf for rf in required_fields if rf not in included_fields]
+        if missing_fields:
+            raise endpoints.BadRequestException("Session '%s' field required" % "', '".join(missing_fields))
+
+        # If exists, sort on inequality filter first
+        if inequality_filter:
+            q = q.order(ndb.GenericProperty(inequality_filter))
+        q = q.order(Session.name)
+
+        for filtr in filters:
+            if filtr["field"] in ["duration"]:
+                filtr["value"] = int(filtr["value"])
+            elif filtr["field"] in ["highlights"]:
+                filtr["value"] = str(filtr["value"]).lower() == 'true'
+            formatted_query = ndb.query.FilterNode(filtr["field"], filtr["operator"], filtr["value"])
+            q = q.filter(formatted_query)
+        return q
+
+    @endpoints.method(SESSION_QUERY_REQUEST, SessionForms,
+            path='conference/{websafeConferenceKey}/session/query',
+            http_method='POST', name='queryConferenceSessions')
+    def queryConferenceSessions(self, request):
+        """Return requested Sessions (by websafeConferenceKey, filters)."""
+        conf = ndb.Key(urlsafe=request.websafeConferenceKey).get()
+        # check that conference exists
+        if not conf:
+            raise endpoints.NotFoundException(
+                'No conference found with key: %s' % request.websafeConferenceKey)
+        sessions = self._getSessionQuery(request, ancestor=conf.key)
+        return SessionForms(items = [self._copySessionToForm(session, getattr(conf, 'name')) for session in sessions])
+
+# - - - Featured speaker - - - - - - - - - - - - - - - - - - - -
+
+    @staticmethod
+    def _cacheFeaturedSpeakers(websafeSessionKey):
+        """Create Featured Speakers & assign to memcache; used by
+        memcache cron job & SetFeaturedSpeakerHandler().
+        """
+        session = ndb.Key(urlsafe=websafeSessionKey).get()
+        c_key = ndb.Key(urlsafe=session.conferenceKey)
+        c_name = c_key.get().name
+        # set featured speaker, if any
+        for speaker in session.speakers:
+            sessions = Session.query(ancestor=c_key).filter(Session.speakers == speaker)
+            # if speak at > 1 sessions, the speaker is featured
+            if sessions and sessions.count() > 1:
+                # add featured speaker to memcache
+                featured_speakers = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
+                # can't use defaultdict(lambda: defaultdict(str)) since function can't be serialized
+                if featured_speakers is None:
+                    featured_speakers = {}
+                if str(session.conferenceKey) not in featured_speakers.keys():
+                    featured_speakers[str(session.conferenceKey)] = defaultdict(str)
+                featured_speakers[str(session.conferenceKey)][speaker] = FEATURED_SPEAKER_TPL %(speaker, sessions.count(), c_name, ', '.join([s.name for s in sessions]))
+                memcache.set(MEMCACHE_FEATUREDSPEAKER_KEY, featured_speakers)
+        return featured_speakers
+
+#
+    @endpoints.method(CONF_GET_REQUEST, StringMessages,
+            path='conference/{websafeConferenceKey}/getFeaturedSpeaker',
+            http_method='GET',
+            name='getFeaturedSpeaker')
+    def getFeaturedSpeaker(self, request):
+        """Return Announcement from memcache."""
+        featured_speakers = memcache.get(MEMCACHE_FEATUREDSPEAKER_KEY)
+        fs = ['']
+        if featured_speakers:
+            fs = featured_speakers.get(str(request.websafeConferenceKey), {}).values()
+        return StringMessages(data=fs)
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
