@@ -933,6 +933,25 @@ class ConferenceApi(remote.Service):
         sessions = self._getSessionQuery(request, ancestor=conf.key)
         return SessionForms(items = [self._copySessionToForm(session, getattr(conf, 'name')) for session in sessions])
 
+    @endpoints.method(message_types.VoidMessage, SessionForms,
+            path='filterSessionPlayground',
+            http_method='GET',
+            name='filterSessionPlayground')
+    def filterSessionPlayground(self, request):
+        """Filter Playground"""
+        q = Session.query()
+        # field = "city"
+        # operator = "="
+        # value = "London"
+        # f = ndb.query.FilterNode(field, operator, value)
+        # q = q.filter(f)
+        q = q.filter(Session.typeOfSession!="Workshop")
+        latest_start = datetime.strptime('15:00', "%H:%M").time()
+        q = q.filter(Session.startTime < latest_start)
+
+        return SessionForms(
+            items=[self._copySessionToForm(s, "") for s in q]
+        )
 # - - - Featured speaker - - - - - - - - - - - - - - - - - - - -
 
     @staticmethod
