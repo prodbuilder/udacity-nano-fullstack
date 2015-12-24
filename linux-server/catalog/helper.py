@@ -15,6 +15,7 @@
 from sqlalchemy import create_engine, asc, desc, func
 from sqlalchemy.orm import sessionmaker
 from db import Base, User, Category, Item
+from db import DB_NAME
 import random
 import string
 from functools import wraps
@@ -29,7 +30,7 @@ import json
 #--------------------------------------------------------------
 
 #Connect to Database and create database session
-engine = create_engine('sqlite:///catalog.db')
+engine = create_engine(DB_NAME)
 Base.metadata.bind = engine
 
 DBSession = sessionmaker(bind=engine)

@@ -5,6 +5,8 @@ from sqlalchemy import create_engine
 import datetime
 import sqlalchemy
 
+DB_NAME = 'postgresql://catalog:udacity@localhost/catalog'
+
 Base = declarative_base()
 
 class User(Base):
@@ -70,6 +72,6 @@ class Item(Base):
 
 
 # engine = create_engine('sqlite:///catalog.db')
-engine = create_engine('postgresql://catalog:udacity@localhost/catalog')
+engine = create_engine(DB_NAME)
 
 Base.metadata.create_all(engine)
