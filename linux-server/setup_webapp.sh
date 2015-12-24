@@ -1,8 +1,8 @@
-path='/root/udacity-nano-fullstack/linux-server/catalog/'
+path='/root/udacity-nano-fullstack/linux-server/'
 USER=catalog
 
 mkdir /var/www/catalog
-cp -R $path /var/www/catalog
+cp -R $path"catalog" /var/www/catalog
 chown -R $USER:$USER /var/www/catalog
 chmod -R 755 /var/www
 
