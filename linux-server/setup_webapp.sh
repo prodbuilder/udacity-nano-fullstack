@@ -7,7 +7,7 @@ cp -R $path"catalog" $targetpath
 cp $path"catalog.wsgi" $targetpath/catalog.wsgi
 
 # rename application.py
-mv $targetpath"/application.py" $targetpath"/catalog.py"
+mv $targetpath"/catalog/application.py" $targetpath"/catalog/catalog.py"
 # remove old sqlite db
 rm $targetpath"/catalog.db"
 
