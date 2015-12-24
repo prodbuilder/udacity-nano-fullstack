@@ -1,10 +1,10 @@
-path='/root/udacity-nano-fullstack/linux-server/catalog'
+path='/root/udacity-nano-fullstack/linux-server/catalog/'
 USER=catalog
 
 mkdir /var/www/catalog
 cp -R $path /var/www/catalog
-sudo chown -R $USER:$USER /var/www/catalog
-sudo chmod -R 755 /var/www
+chown -R $USER:$USER /var/www/catalog
+chmod -R 755 /var/www
 
 # copy conf
 cp $path"catalog.conf" /etc/apache2/sites-available/catalog.conf
