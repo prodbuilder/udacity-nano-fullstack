@@ -4,10 +4,6 @@ from collections import namedtuple
 from db import Base, User, Category, Item
 import random
 
-
-DB_NAME = 'catalog'
-
-
 class DataCreater(object):
 
     def __init__(self, DB_NAME):
@@ -17,7 +13,8 @@ class DataCreater(object):
         self.define_items()
 
     def get_session(self, DB_NAME):
-        engine = create_engine('sqlite:///%s.db' %DB_NAME)
+        engine = create_engine('postgresql://catalog:udacity@localhost/catalog')
+
         Base.metadata.bind = engine
         DBSession = sessionmaker(bind=engine)
         self.session = DBSession(autocommit = True)
