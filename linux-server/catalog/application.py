@@ -19,7 +19,7 @@ from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
 import json
 import requests
-
+import os
 
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
@@ -33,6 +33,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 csrf = SeaSurf(app)
 
+curr_path =  os.path.dirname(os.path.abspath(os.path.realpath(__file__)))
 #--------------------------------------------------------------
 # Global Functions
 #--------------------------------------------------------------
@@ -95,8 +96,8 @@ def fbconnect():
         return returnResponseJSON('Invalid state parameter.', 401)
 
     access_token = request.data
-    client_secret = json.loads(open('fb_client_secrets.json', 'r').read())[
-        'web']
+    client_secret = json.loads(open(
+        os.path.join(curr_path, 'fb_client_secrets.json'), 'r').read())['web']
     app_id = client_secret['app_id']
     app_secret = client_secret['app_secret']
     url = 'https://graph.facebook.com/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s' % (app_id, app_secret, access_token)
@@ -147,7 +148,7 @@ def gconnect():
 
     try:
         # Upgrade the authorization code into a credentials object
-        oauth_flow = flow_from_clientsecrets('google_client_secrets.json', scope='')
+        oauth_flow = flow_from_clientsecrets(os.path.join(curr_path, 'google_client_secrets.json'), scope='')
         oauth_flow.redirect_uri = 'postmessage'
         credentials = oauth_flow.step2_exchange(request.data)
     except FlowExchangeError:
