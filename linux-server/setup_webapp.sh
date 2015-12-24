@@ -14,6 +14,10 @@ rm $targetpath"/catalog.db"
 chown -R $USER:$USER $targetpath
 chmod -R 755 /var/www
 
+# this got rid of the permission denied error when uploading
+# but is weird!
+chmod -R 777 /var/www/catalog/catalog/uploads
+
 # copy conf
 cp $path"catalog.conf" /etc/apache2/sites-available/catalog.conf
 
