@@ -1,9 +1,11 @@
 path='/root/udacity-nano-fullstack/linux-server/'
 USER=catalog
+target_path = '/var/www/catalog'
 
 mkdir /var/www/catalog
-cp -R $path"catalog" /var/www/catalog
-chown -R $USER:$USER /var/www/catalog
+cp -R $path"catalog" $target_path
+cp $path"catalog.wsgi" $target_path/catalog.wsgi
+chown -R $USER:$USER $target_path
 chmod -R 755 /var/www
 
 # copy conf
