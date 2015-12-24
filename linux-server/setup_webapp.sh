@@ -1,6 +1,6 @@
 path='/root/udacity-nano-fullstack/linux-server/'
 USER=catalog
-targetpath = '/var/www/catalog'
+targetpath='/var/www/catalog'
 
 mkdir /var/www/catalog
 cp -R $path"catalog" $targetpath
