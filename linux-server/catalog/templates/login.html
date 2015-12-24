@@ -1,0 +1,21 @@
+{% extends "main.html" %}
+{% block content %}
+<div class="row">
+        <h2>Login with G+ or Facebook</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+    {% include "inc/glogin.html" %}
+    </div>
+    <div class="col-md-3">
+    {% include "inc/fblogin.html" %}
+    </div>
+</div>
+
+
+<div class="row">
+    <div id="result"></div>
+</div>
+
+{% endblock %}

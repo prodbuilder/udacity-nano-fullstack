@@ -1,0 +1,30 @@
+{% extends "main.html" %}
+{% block content %}
+<div class="row">
+
+        <a href="{{url_for('showCategoryItemsByName', category_name = item.category.name)}}"><span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span> {{item.category.name}}</a>
+        <h1>{{item.name}}</h1>
+
+</div>
+
+<div class="row">
+    <p> <b>Author</b>: {{item.user.name}} </p>
+    <p>
+        <b>Description</b>: {{item.description}}
+    </p>
+
+    {% if item.picture %}
+      <img src="/uploads/{{item.picture}}" alt="{{item.name}}">
+    {% endif %}
+
+    {% if item.user.id == session['user_id'] %}
+
+        <div class="padding-bottom"></div>
+
+        <a href="{{url_for('editItemByName', category_name = item.category.name, item_name = item.name)}}"><span class="glyphicon glyphicon-pencil" aria-hidden="true"></span>Edit</a>
+
+        <span class="margin-right"></span>
+        <a href="{{url_for('deleteItemByName', category_name = item.category.name, item_name = item.name)}}"><span class="glyphicon glyphicon-trash" aria-hidden="true"></span>Delete</a>
+    {% endif %}
+</div>
+{% endblock %}

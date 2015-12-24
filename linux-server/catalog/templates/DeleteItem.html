@@ -1,0 +1,28 @@
+{% extends "main.html" %}
+{% block content %}
+    {% if item.user.id == session['user_id'] %}
+    <div class="row">
+        <h2> Are you sure you want to delete {{item.name}}? </h2>
+    </div>
+
+    <div class="row">
+    <form action="#" method = 'post'>
+        <div style="display:none">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+        </div>
+
+        <button type="submit" class="btn btn-default delete" id="submit" name="submit">
+        <span class="glyphicon glyphicon-trash" aria-hidden="true"></span> Delete</button>
+
+        <a href='{{url_for('showCategoryItemByName', category_name = item.category.name, item_name = item.name)}}'>
+        <input type="button" class="btn btn-default delete" id="cancel" name="cancel" value="&times; Cancel"></a>
+
+    </form>
+    </div>
+
+    {% else %}
+    <div class="row">
+        <h2> You can not delete someone else's item! </h2>
+    </div>
+    {% endif %}
+{% endblock %}
