@@ -11,6 +11,7 @@ Setup Basic Linux Server
     - Perform Basic Configurations
         - Launch your Virtual Machine with your Udacity account and log in.
         - Create a new user named grader and grant this user sudo permissions.
+        - Disable root user
         - Update all currently installed packages.
         - Configure the local timezone to UTC.
     - Secure your Server:
@@ -26,6 +27,10 @@ Setup Basic Linux Server
         - Configure and enable virtual host
         - Make `.git` directory not publicly accessible via a browser!
         - Change SQLite to Postgres DB
+    - Additional monitoring and upgrades
+        - Automatic upgrade with `unattended-upgrades`
+        - Monitor repeated unsuccessful attempts with `fail2ban`
+        - Monitor status of server with `glances`
 - References
 
 <!-- /MarkdownTOC -->
@@ -55,7 +60,10 @@ Setup Basic Linux Server
     + Clone repo `catalog` from project 3
     + Check `.git` is excluded from public view
     + Config and run application
-
+- Additional monitoring and upgrades
+    + Automatic upgrade with `unattended-upgrades`
+    + Monitor repeated unsuccessful attempts with `fail2ban`
+    + Monitor status of server with `glances`
 
 ## Details of the tasks
 
@@ -108,6 +116,12 @@ service ssh restart
 ```
 
 Now I can login with `ssh -i ~/.ssh/grader.rsa grader@52.10.197.21 -p 2200`
+
+#### Disable root user
+1. To allow new users, append to `/etc/ssh/sshd_config` `AllowUsers grader, catalog`.
+2. Change `PermitRootLogin no`
+3. Add `DenyUsers root`
+4. Restart sshd service: `service ssh restart`
 
 
 #### Update all currently installed packages. 
@@ -277,7 +291,9 @@ Copy the `catalog.wsgi` file to `/var/www/udacity-nano-fullstack/catalog.wsgi`
 
 Then `service apache2 restart`
 
+4. Now sever is serving your catalog app at http://ec2-52-10-197-21.us-west-2.compute.amazonaws.com/, but is still configured to server the default apache page at http://52.10.197.21/. To disable the default virtual host, `sudo a2dissite 000-default.conf`.
 
+5. Careful! Disable Flask debug mode in `catalog.py`.
 
 #### Make `.git` directory not publicly accessible via a browser! 
 
@@ -308,6 +324,34 @@ This involves changing the DB_NAME when creating engine.
 For client secret files for G+ and Facebook login, referring to the absolute path.
 Add `http://ec2-52-10-197-21.us-west-2.compute.amazonaws.com/` to properly configure third party authentication. 
 
+### Additional monitoring and upgrades
+
+#### Automatic upgrade with `unattended-upgrades`
+https://wiki.debian.org/UnattendedUpgrades
+`apt-get install unattended-upgrades apt-listchanges`
+Edit `/etc/apt/apt.conf.d/50unattended-upgrades` and uncomment `Unattended-Upgrade::Mail "root";`
+
+To activate, `nano /etc/apt/apt.conf.d/20auto-upgrades`
+Add the following contents
+```
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+```
+
+#### Monitor repeated unsuccessful attempts with `fail2ban`
+These links contain excellent information on using `Fail2ban` for `ssh`, `apache` and `nginx`. 
+https://www.digitalocean.com/community/tutorials/how-to-protect-ssh-with-fail2ban-on-ubuntu-14-04
+http://www.fail2ban.org/wiki/index.php/Downloads
+
+```sh
+apt-get install fail2ban
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+```
+For now, accepting the default.
+
+#### Monitor status of server with `glances`
+Install `glances`, a cross-platform curses-based monitoring tool with `pip install glances`.https://nicolargo.github.io/glances/
+See results with `glances`.
 
 ## References
 
