@@ -118,7 +118,8 @@ service ssh restart
 Now I can login with `ssh -i ~/.ssh/grader.rsa grader@52.10.197.21 -p 2200`
 
 #### Disable root user
-1. To allow new users, append to `/etc/ssh/sshd_config` `AllowUsers grader, catalog`.
+1. To allow new users, append to `/etc/ssh/sshd_config` the following
+`AllowUsers grader catalog`. Watch out! `AllowUsers` is space delimited!
 2. Change `PermitRootLogin no`
 3. Add `DenyUsers root`
 4. Restart sshd service: `service ssh restart`
