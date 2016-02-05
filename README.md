@@ -1,7 +1,7 @@
 [![Code Climate](https://codeclimate.com/github/prodbuilder/udacity-nano-fullstack/badges/gpa.svg)](https://codeclimate.com/github/prodbuilder/udacity-nano-fullstack)
 [![Test Coverage](https://codeclimate.com/github/prodbuilder/udacity-nano-fullstack/badges/coverage.svg)](https://codeclimate.com/github/prodbuilder/udacity-nano-fullstack/coverage)
 [![Issue Count](https://codeclimate.com/github/prodbuilder/udacity-nano-fullstack/badges/issue_count.svg)](https://codeclimate.com/github/prodbuilder/udacity-nano-fullstack)
-# Udacity Nano Degree
+# Udacity Full Stack Web Developer Nanodegree
 
 _Yu Guo_, **2015-10-25** to **2015-12-25**
 
